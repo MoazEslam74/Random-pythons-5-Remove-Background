@@ -1,1 +1,4 @@
-"rembg[cpu]" pillow
+"rembg[cpu]" 
+pillow
+ultralytics 
+opencv-python
