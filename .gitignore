@@ -2,3 +2,6 @@
 *.png
 *.jpeg
 *.jpg
+
+#ignore the model files
+*.pt
