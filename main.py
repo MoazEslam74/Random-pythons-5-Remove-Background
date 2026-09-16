@@ -87,7 +87,7 @@ class ObjectExtractorApp:
         cv_image = cv2.imread(path)
         self.cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB) 
         
-        results = self.model(self.cv_image_rgb)
+        results = self.model(self.cv_image_rgb,conf=0.15)  # Adjust confidence threshold as needed
         self.detected_boxes = []
         self.selected_box = None 
         
@@ -148,47 +148,52 @@ class ObjectExtractorApp:
         self.display_numpy_image(draw_img)
 
     def extract_and_save(self):
-        """Applies Gaussian blur to background and passes to rembg"""
         if self.selected_box is None or self.cv_image_rgb is None:
             return
             
-        # Update UI to show processing state
         self.extract_btn.config(text=self.LANG_DATA[self.lang]["extracting"], state=tk.DISABLED)
         self.root.update()
 
         try:
-            # 1. Get original clean image
             img = self.cv_image_rgb.copy()
             x1, y1, x2, y2 = self.selected_box
 
-            # 2. Create a fully blurred version of the image
-            # Using a large kernel (99,99) to strongly blur high-frequency details
+            # --- New adjustment: calculate a safe padding margin ---
+            # Expand the box by 15% of the object's width and height
+            padding_percent = 0.15
+            w = x2 - x1
+            h = y2 - y1
+            
+            pad_x = int(w * padding_percent)
+            pad_y = int(h * padding_percent)
+            
+            # Calculate the new coordinates while ensuring they do not exceed the image bounds
+            img_h, img_w = img.shape[:2]
+            px1 = max(0, x1 - pad_x)
+            py1 = max(0, y1 - pad_y)
+            px2 = min(img_w, x2 + pad_x)
+            py2 = min(img_h, y2 + pad_y)
+
+            # Blur the image
             blurred_img = cv2.GaussianBlur(img, (99, 99), 30)
 
-            # 3. Extract the sharp region (the selected object) from the ORIGINAL image
-            sharp_roi = img[y1:y2, x1:x2]
+            # Extract the sharp region using the expanded coordinates
+            sharp_roi = img[py1:py2, px1:px2]
 
-            # 4. Paste the sharp region onto the blurred image
+            # Merge the sharp region back
             manipulated_img = blurred_img.copy()
-            manipulated_img[y1:y2, x1:x2] = sharp_roi
+            manipulated_img[py1:py2, px1:px2] = sharp_roi
 
-            # 5. Convert to PIL Image for rembg
             manipulated_pil = Image.fromarray(manipulated_img)
-
-            # 6. Pass to rembg
             final_output = remove(manipulated_pil)
             
-            # 7. Save the result
-            save_path = "isolated_object.png"
-            final_output.save(save_path)
-
+            final_output.save("isolated_object.png")
             messagebox.showinfo("Success", self.LANG_DATA[self.lang]["success"])
             
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
             
         finally:
-            # Restore button state
             self.extract_btn.config(text=self.LANG_DATA[self.lang]["extract_button"], state=tk.NORMAL)
 
 if __name__ == "__main__":
