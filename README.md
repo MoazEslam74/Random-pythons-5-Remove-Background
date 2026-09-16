@@ -35,7 +35,7 @@ Open your terminal or command prompt and run the following command to install th
 pip install ultralytics opencv-python pillow rembg[cpu]
 ```
 
-<p> <b>Note on First Run:</b> Upon launching the app for the very first time, a setup splash screen will appear. The app will download the necessary AI models (<code>yolov8n.pt</code> and <code>U²-Net</code> weights) in the background. This requires an internet connection and may take a few minutes. Subsequent launches will take only seconds and can work completely offline.</p>
+> <p> <b>Note on First Run:</b> Upon launching the app for the very first time, a setup splash screen will appear. The app will download the necessary AI models (<code>yolov8n.pt</code> and <code>U²-Net</code> weights) in the background. This requires an internet connection and may take a few minutes. Subsequent launches will take only seconds and can work completely offline.</p>
 
 ## 🧠 How the Pipeline Works (Under the Hood)
 
