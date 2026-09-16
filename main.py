@@ -4,7 +4,7 @@ from PIL import Image, ImageTk
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from rembg import remove # Added rembg
+from rembg import remove
 
 class ObjectExtractorApp:
     lang = 'ar'
@@ -14,27 +14,34 @@ class ObjectExtractorApp:
             "image_label": "لم يتم اختيار صورة بعد", 
             "processing": "جاري المعالجة...",
             "extract_button": "عزل الكائن المحدد",
-            "extracting": "جاري العزل والحفظ...",
-            "success": "تم حفظ الكائن المعزول بنجاح باسم: isolated_object.png",
-            "manual_mode_btn": "تحديد يدوي (رسم مربع)",
-            "auto_mode_btn": "تحديد تلقائي (YOLO)"
+            "extracting": "جاري العزل...",
+            "success": "تم العزل بنجاح وحفظ الصورة!",
+            "manual_mode_btn": "وضع التحديد: يدوي",
+            "auto_mode_btn": "وضع التحديد: تلقائي",
+            "input_title": "الصورة الأصلية (للتحديد)",
+            "output_title": "النتيجة النهائية",
+            "output_placeholder": "ستظهر النتيجة هنا"
         },
         'en': {
             "upload_button": "Upload Image", 
             "image_label": "No image selected yet", 
             "processing": "Processing...",
-            "extract_button": "Extract Selected Object",
-            "extracting": "Extracting and saving...",
-            "success": "Isolated object saved successfully as: isolated_object.png",
-            "manual_mode_btn": "Manual Selection (Draw Box)",
-            "auto_mode_btn": "Auto Selection (YOLO)"
+            "extract_button": "Extract Selected",
+            "extracting": "Extracting...",
+            "success": "Extracted and saved successfully!",
+            "manual_mode_btn": "Mode: Manual",
+            "auto_mode_btn": "Mode: Auto (YOLO)",
+            "input_title": "Input Image",
+            "output_title": "Final Result",
+            "output_placeholder": "Result will appear here"
         }
     }
     
     def __init__(self, root):
         self.root = root
-        self.root.title("أداة العزل الذكية")
-        self.root.geometry("800x800") 
+        self.root.title("أداة العزل الذكية | Smart Extractor")
+        self.root.geometry("1100x700") 
+        self.root.configure(bg="#f0f2f5") # Modern light background
 
         # Load the YOLO model
         self.model = YOLO('yolov8n.pt')
@@ -51,26 +58,59 @@ class ObjectExtractorApp:
         self.is_manual_mode = False
         self.start_x = None
         self.start_y = None
-        self.current_rect = None # To store the temporary drawn rectangle
+        self.current_rect = None
 
-        # --- Interface elements ---
-        self.lang_toggle_btn = tk.Button(self.root, text="English", command=self.toggle_language, font=("Arial", 12))
-        self.lang_toggle_btn.pack(pady=5)
-        
-        # Mode toggle button
-        self.mode_toggle_btn = tk.Button(self.root, text=self.LANG_DATA[self.lang]["manual_mode_btn"], command=self.toggle_mode, font=("Arial", 12), bg="lightgray")
-        self.mode_toggle_btn.pack(pady=5)
+        self.setup_ui()
 
-        self.upload_btn = tk.Button(self.root, text=self.LANG_DATA[self.lang]["upload_button"], command=self.upload_image, font=("Arial", 14))
-        self.upload_btn.pack(pady=10)
+    def setup_ui(self):
+        """Builds the modern GUI layout"""
+        # Styling variables
+        btn_font = ("Helvetica", 11, "bold")
+        title_font = ("Helvetica", 13, "bold")
+        
+        # --- 1. Top Control Panel ---
+        self.control_frame = tk.Frame(self.root, bg="#ffffff", bd=1, relief="ridge", pady=10, padx=10)
+        self.control_frame.pack(fill=tk.X, pady=(10, 5), padx=20)
+        
+        # Left side controls
+        self.lang_toggle_btn = tk.Button(self.control_frame, text="English", command=self.toggle_language, font=btn_font, bg="#e4e6eb", relief="flat", padx=10)
+        self.lang_toggle_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.mode_toggle_btn = tk.Button(self.control_frame, text=self.LANG_DATA[self.lang]["manual_mode_btn"], command=self.toggle_mode, font=btn_font, bg="#e4e6eb", relief="flat", padx=10)
+        self.mode_toggle_btn.pack(side=tk.LEFT, padx=5)
 
-        # Extraction button (Hidden initially)
-        self.extract_btn = tk.Button(self.root, text=self.LANG_DATA[self.lang]["extract_button"], command=self.extract_and_save, font=("Arial", 14), bg="lightblue")
+        # Right side controls
+        self.extract_btn = tk.Button(self.control_frame, text=self.LANG_DATA[self.lang]["extract_button"], command=self.extract_and_save, font=btn_font, bg="#4CAF50", fg="white", relief="flat", padx=15, state=tk.DISABLED)
+        self.extract_btn.pack(side=tk.RIGHT, padx=5)
+
+        self.upload_btn = tk.Button(self.control_frame, text=self.LANG_DATA[self.lang]["upload_button"], command=self.upload_image, font=btn_font, bg="#007bff", fg="white", relief="flat", padx=15)
+        self.upload_btn.pack(side=tk.RIGHT, padx=5)
+
+        # --- 2. Main Display Area (Side-by-Side) ---
+        self.images_frame = tk.Frame(self.root, bg="#f0f2f5")
+        self.images_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Left Panel (Input)
+        self.input_frame = tk.Frame(self.images_frame, bg="#ffffff", bd=1, relief="ridge")
+        self.input_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         
-        self.image_label = tk.Label(self.root, text=self.LANG_DATA[self.lang]["image_label"], font=("Arial", 12))
-        self.image_label.pack(expand=True, pady=10)
+        self.input_title = tk.Label(self.input_frame, text=self.LANG_DATA[self.lang]["input_title"], font=title_font, bg="#ffffff", fg="#333")
+        self.input_title.pack(pady=10)
         
-        # Bind mouse events for both clicking and drawing
+        self.image_label = tk.Label(self.input_frame, text=self.LANG_DATA[self.lang]["image_label"], bg="#ffffff", font=("Helvetica", 11))
+        self.image_label.pack(expand=True)
+
+        # Right Panel (Output)
+        self.output_frame = tk.Frame(self.images_frame, bg="#ffffff", bd=1, relief="ridge")
+        self.output_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
+        
+        self.output_title = tk.Label(self.output_frame, text=self.LANG_DATA[self.lang]["output_title"], font=title_font, bg="#ffffff", fg="#333")
+        self.output_title.pack(pady=10)
+        
+        self.output_label = tk.Label(self.output_frame, text=self.LANG_DATA[self.lang]["output_placeholder"], bg="#ffffff", font=("Helvetica", 11))
+        self.output_label.pack(expand=True)
+
+        # Bind events
         self.image_label.bind("<Button-1>", self.on_mouse_down)
         self.image_label.bind("<B1-Motion>", self.on_mouse_drag)
         self.image_label.bind("<ButtonRelease-1>", self.on_mouse_up)
@@ -83,26 +123,28 @@ class ObjectExtractorApp:
     def update_interface_language(self):
         self.upload_btn.config(text=self.LANG_DATA[self.lang]["upload_button"])
         self.extract_btn.config(text=self.LANG_DATA[self.lang]["extract_button"])
+        self.input_title.config(text=self.LANG_DATA[self.lang]["input_title"])
+        self.output_title.config(text=self.LANG_DATA[self.lang]["output_title"])
+        
         if self.is_manual_mode:
             self.mode_toggle_btn.config(text=self.LANG_DATA[self.lang]["auto_mode_btn"])
         else:
              self.mode_toggle_btn.config(text=self.LANG_DATA[self.lang]["manual_mode_btn"])
+             
         if self.cv_image_rgb is None:
             self.image_label.config(text=self.LANG_DATA[self.lang]["image_label"])
+            self.output_label.config(text=self.LANG_DATA[self.lang]["output_placeholder"])
 
     def toggle_mode(self):
-        """Switches between Auto (YOLO) and Manual drawing modes"""
         self.is_manual_mode = not self.is_manual_mode
         if self.is_manual_mode:
-            self.mode_toggle_btn.config(text=self.LANG_DATA[self.lang]["auto_mode_btn"], bg="yellow")
-            # Clear auto-detected boxes when switching to manual
+            self.mode_toggle_btn.config(text=self.LANG_DATA[self.lang]["auto_mode_btn"], bg="#ffc107") # Warning yellow for manual
             self.selected_box = None
+            self.extract_btn.config(state=tk.DISABLED)
             if self.cv_image_rgb is not None:
                 self.display_numpy_image(self.cv_image_rgb.copy())
-                self.extract_btn.pack_forget()
         else:
-            self.mode_toggle_btn.config(text=self.LANG_DATA[self.lang]["manual_mode_btn"], bg="lightgray")
-            # Re-run YOLO if switching back to auto mode and we have an image
+            self.mode_toggle_btn.config(text=self.LANG_DATA[self.lang]["manual_mode_btn"], bg="#e4e6eb")
             if self.current_image_path:
                  self.process_and_display_image(self.current_image_path)
 
@@ -115,13 +157,13 @@ class ObjectExtractorApp:
         if file_path:
             self.current_image_path = file_path
             self.image_label.config(text=self.LANG_DATA[self.lang]["processing"], image="")
-            self.extract_btn.pack_forget() 
+            self.output_label.config(text=self.LANG_DATA[self.lang]["output_placeholder"], image="")
+            self.extract_btn.config(state=tk.DISABLED)
             self.root.update()
             
             if not self.is_manual_mode:
                 self.process_and_display_image(file_path)
             else:
-                # If in manual mode, just load and display the image without YOLO
                 cv_image = cv2.imread(file_path)
                 self.cv_image_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
                 self.display_numpy_image(self.cv_image_rgb.copy())
@@ -140,7 +182,7 @@ class ObjectExtractorApp:
             for box in result.boxes.xyxy: 
                 x1, y1, x2, y2 = map(int, box[:4])
                 self.detected_boxes.append((x1, y1, x2, y2))
-                cv2.rectangle(draw_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                cv2.rectangle(draw_img, (x1, y1), (x2, y2), (0, 255, 0), 2) # Thinner green lines
 
         self.display_numpy_image(draw_img)
 
@@ -149,7 +191,8 @@ class ObjectExtractorApp:
         orig_w, orig_h = img_pil.size
         
         display_img = img_pil.copy()
-        display_img.thumbnail((600, 450))
+        # Adjusted size for side-by-side layout
+        display_img.thumbnail((500, 500)) 
         disp_w, disp_h = display_img.size
         
         self.scale_x = orig_w / disp_w
@@ -168,13 +211,11 @@ class ObjectExtractorApp:
         orig_y = int(event.y * self.scale_y)
         
         if self.is_manual_mode:
-            # Start drawing a new box
             self.start_x = orig_x
             self.start_y = orig_y
             self.selected_box = None
-            self.extract_btn.pack_forget()
+            self.extract_btn.config(state=tk.DISABLED)
         else:
-            # Auto mode: handle click selection (from previous implementation)
             if not self.detected_boxes:
                 return
             clicked_box = None
@@ -187,22 +228,19 @@ class ObjectExtractorApp:
             if clicked_box:
                 self.selected_box = clicked_box
                 self.highlight_selected_box()
-                self.extract_btn.pack(after=self.upload_btn, pady=10)
+                self.extract_btn.config(state=tk.NORMAL) # Enable button
 
     def on_mouse_drag(self, event):
-        """Draw a temporary rectangle while dragging in manual mode"""
         if not self.is_manual_mode or self.start_x is None or self.cv_image_rgb is None:
             return
             
         current_x = int(event.x * self.scale_x)
         current_y = int(event.y * self.scale_y)
         
-        # Constrain coordinates to image bounds
         img_h, img_w = self.cv_image_rgb.shape[:2]
         current_x = max(0, min(current_x, img_w))
         current_y = max(0, min(current_y, img_h))
 
-        # Ensure correct box format (x1, y1, x2, y2) regardless of drag direction
         x1 = min(self.start_x, current_x)
         y1 = min(self.start_y, current_y)
         x2 = max(self.start_x, current_x)
@@ -210,30 +248,25 @@ class ObjectExtractorApp:
         
         self.current_rect = (x1, y1, x2, y2)
         
-        # Draw the temporary box
         draw_img = self.cv_image_rgb.copy()
-        cv2.rectangle(draw_img, (x1, y1), (x2, y2), (255, 165, 0), 3) # Orange for manual drawing
+        cv2.rectangle(draw_img, (x1, y1), (x2, y2), (255, 165, 0), 2)
         self.display_numpy_image(draw_img)
 
     def on_mouse_up(self, event):
-        """Finalize the drawn box and enable extraction"""
         if not self.is_manual_mode or self.start_x is None or self.current_rect is None:
              return
              
-        # Set the selected box to the finalized manual rectangle
         self.selected_box = self.current_rect
         self.start_x = None
         self.start_y = None
         self.current_rect = None
         
-        # Show extraction button
         if self.selected_box:
-             # Redraw with final highlight color (Red)
              draw_img = self.cv_image_rgb.copy()
              x1, y1, x2, y2 = self.selected_box
-             cv2.rectangle(draw_img, (x1, y1), (x2, y2), (255, 0, 0), 5)
+             cv2.rectangle(draw_img, (x1, y1), (x2, y2), (255, 0, 0), 4)
              self.display_numpy_image(draw_img)
-             self.extract_btn.pack(after=self.upload_btn, pady=10)
+             self.extract_btn.config(state=tk.NORMAL) # Enable button
 
     def highlight_selected_box(self):
         draw_img = self.cv_image_rgb.copy()
@@ -241,7 +274,7 @@ class ObjectExtractorApp:
         for box in self.detected_boxes:
             x1, y1, x2, y2 = box
             if box == self.selected_box:
-                cv2.rectangle(draw_img, (x1, y1), (x2, y2), (255, 0, 0), 5)
+                cv2.rectangle(draw_img, (x1, y1), (x2, y2), (255, 0, 0), 4)
             else:
                 cv2.rectangle(draw_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
@@ -252,13 +285,13 @@ class ObjectExtractorApp:
             return
             
         self.extract_btn.config(text=self.LANG_DATA[self.lang]["extracting"], state=tk.DISABLED)
+        self.output_label.config(text=self.LANG_DATA[self.lang]["processing"], image="")
         self.root.update()
 
         try:
             img = self.cv_image_rgb.copy()
             x1, y1, x2, y2 = self.selected_box
 
-            # Calculate safe padding margin (15%)
             padding_percent = 0.15
             w = x2 - x1
             h = y2 - y1
@@ -273,16 +306,25 @@ class ObjectExtractorApp:
             py2 = min(img_h, y2 + pad_y)
 
             blurred_img = cv2.GaussianBlur(img, (99, 99), 30)
-
             sharp_roi = img[py1:py2, px1:px2]
 
             manipulated_img = blurred_img.copy()
             manipulated_img[py1:py2, px1:px2] = sharp_roi
 
             manipulated_pil = Image.fromarray(manipulated_img)
+            
+            # Run rembg
             final_output = remove(manipulated_pil)
             
+            # 1. Save the result
             final_output.save("isolated_object.png")
+            
+            # 2. Display the result in the output panel
+            display_out = final_output.copy()
+            display_out.thumbnail((500, 500))
+            self.tk_output_image = ImageTk.PhotoImage(display_out)
+            self.output_label.config(image=self.tk_output_image, text="")
+
             messagebox.showinfo("Success", self.LANG_DATA[self.lang]["success"])
             
         except Exception as e:
