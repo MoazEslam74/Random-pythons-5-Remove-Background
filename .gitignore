@@ -5,3 +5,9 @@
 
 #ignore the model files
 *.pt
+
+#ignore the extraction files
+build/
+dist/
+build_exe.py
+*.spec

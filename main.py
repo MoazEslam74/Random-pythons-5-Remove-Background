@@ -5,7 +5,8 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 from rembg import remove
-
+import threading
+from rembg import new_session 
 class ObjectExtractorApp:
     lang = 'ar'
     LANG_DATA = {
@@ -333,7 +334,56 @@ class ObjectExtractorApp:
         finally:
             self.extract_btn.config(text=self.LANG_DATA[self.lang]["extract_button"], state=tk.NORMAL)
 
+class SplashScreen:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("تهيئة البرنامج | Setup")
+        self.root.geometry("550x250")
+        self.root.configure(bg="#ffffff")
+        
+        # Prevent resizing while loading
+        self.root.resizable(False, False)
+        
+        # Screen text
+        self.title_label = tk.Label(root, text="جاري إعداد بيئة العمل...", font=("Helvetica", 16, "bold"), bg="#ffffff", fg="#333")
+        self.title_label.pack(pady=(50, 10))
+        
+        self.info_label = tk.Label(root, text="يتم الآن تحميل النماذج الذكية (للمرة الأولى فقط).\nالرجاء الانتظار، قد يستغرق الأمر بضع دقائق بناءً على سرعة الإنترنت...", font=("Helvetica", 11), bg="#ffffff", fg="#666")
+        self.info_label.pack(pady=10)
+        
+        # Run the loading process in a background thread so the UI does not freeze
+        threading.Thread(target=self.download_models, daemon=True).start()
+
+    def download_models(self):
+        try:
+            # 1. Load and prepare the YOLO model
+            # It will look for yolov8n.pt and download it if it is missing
+            YOLO('yolov8n.pt')
+            
+            # 2. Load and prepare the rembg model (u2net)
+            # This function ensures the model weights are present and downloads them if needed
+            new_session("u2net")
+            
+            # After a successful load, instruct the main window to continue to the app
+            # We use after() to safely return to Tkinter's main thread
+            self.root.after(0, self.start_main_app)
+            
+        except Exception as e:
+            self.info_label.config(text=f"An error occurred while loading. Please check your internet connection.\n{str(e)}", fg="red")
+
+    def start_main_app(self):
+        # 1. Clear the splash screen contents
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # 2. Re-enable window resizing
+        self.root.resizable(True, True)
+        
+        # 3. Launch the main application class
+        app = ObjectExtractorApp(self.root)
+
 if __name__ == "__main__":
     root = tk.Tk()
-    app = ObjectExtractorApp(root)
+    # Run the splash screen first
+    splash = SplashScreen(root)
     root.mainloop()
